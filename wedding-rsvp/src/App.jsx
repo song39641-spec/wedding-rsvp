@@ -211,7 +211,7 @@ export default function App(){
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="text-center space-y-2">
           <img
-    src="/wedding-photo.jpg"
+    src="/20250408-315.jpg"
     alt="婚紗照"
     className="mx-auto rounded-xl shadow-lg max-h-[500px] w-full object-cover"
   />
