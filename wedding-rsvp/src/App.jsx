@@ -418,7 +418,7 @@ export default function App(){
 
                 <div className="lg:col-span-2">
                   <Card className="shadow-sm">
-                    <CardHeader><CardTitle>回覆列表（{entries.length} 筆）</CardHeader></CardHeader>
+                    <CardHeader><CardTitle>回覆列表（{entries.length} 筆）</CardTitle></CardHeader>
                     <CardContent>
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
