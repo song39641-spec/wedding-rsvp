@@ -158,7 +158,7 @@ export default function App(){
 
     // === 新增：先嘗試寫入 Google Sheet（若已設定 URL） ===
     const sendPromise = SHEET_WEBAPP_URL
-      ? fetch(SHEET_WEBAPP_URL, {
+      ? fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ secret: SHEET_SECRET, data: payload }),
