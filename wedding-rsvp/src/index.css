@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+
+/* simple shadcn-like base styles */
+.btn { @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-colors shadow-sm; }
+.btn-primary { @apply bg-slate-900 text-white hover:bg-slate-800; }
+.btn-outline { @apply border border-slate-300 bg-white text-slate-900 hover:bg-slate-50; }
+.btn-secondary { @apply bg-slate-100 text-slate-900 hover:bg-slate-200; }
+.btn-destructive { @apply bg-rose-600 text-white hover:bg-rose-700; }
+
+.card { @apply bg-white rounded-2xl border border-slate-200; }
+.card-header { @apply p-6 pb-0; }
+.card-title { @apply text-lg font-semibold; }
+.card-content { @apply p-6; }
+
+.input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400; }
+.textarea { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 min-h-[100px]; }
+.label { @apply text-sm font-medium text-slate-700; }
+
+.select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400; }
+.tabs-list { @apply inline-flex w-full gap-2; }
+.tabs-trigger { @apply flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm; }
+.tabs-trigger-active { @apply bg-slate-900 text-white; }
