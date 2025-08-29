@@ -141,9 +141,10 @@ export default function RSVPApp() {
   const [confirmIndex, setConfirmIndex] = useState(null); // 刪除確認
   const [successOpen, setSuccessOpen] = useState(false); // 送出成功置中提示
   const [successMsg, setSuccessMsg] = useState("");
-  const [lastDeleted, setLastDeleted] = useState(null); // 最近刪除項目
+  // 移除 lastDeleted 狀態，因為管理者模式下不處理本機復原
+  // const [lastDeleted, setLastDeleted] = useState(null);
 
-  // 管理者模式：改用雲端為單一真實來源；非管理者才會本機暫存
+  // 管理者模式：完全改用雲端為單一真實來源；非管理者才會本機暫存
   useEffect(() => { if (!adminMode) saveEntries(entries); }, [entries, adminMode]);
   useEffect(() => { localStorage.setItem(ADMIN_LS_KEY, adminMode ? "1" : "0"); }, [adminMode]);
   // 進入/切換成管理者模式時，從雲端撈最新資料
@@ -235,10 +236,10 @@ export default function RSVPApp() {
     sendPromise
       .then(() => {
         if (adminMode) {
-          // 管理者模式完全以雲端為準
+          // 管理者模式：送出後直接從雲端重新讀取最新資料
           fetchCloudEntries();
         } else {
-          // 非管理者（賓客）維持本機即時顯示
+          // 非管理者：資料送出成功後更新本機狀態
           if (editingIndex !== null) {
             const next = [...entries];
             next[editingIndex] = payload;
@@ -254,7 +255,7 @@ export default function RSVPApp() {
       })
       .catch(() => {
         if (!adminMode) {
-          // 只有非管理者才會暫存本機
+          // 非管理者：雲端寫入失敗時，仍暫存本機
           if (editingIndex !== null) {
             const next = [...entries];
             next[editingIndex] = payload;
@@ -288,32 +289,39 @@ export default function RSVPApp() {
           });
           const j = await r.json();
           if (!j.ok) throw new Error('proxy not ok');
+          // 雲端刪除成功後，立即從雲端重新讀取最新資料
+          fetchCloudEntries();
+          toast('已從雲端刪除一筆回覆');
         } catch (err) {
-          toast('雲端刪除失敗');
+          toast('雲端刪除失敗，請檢查網路或 Google Sheet 設定');
+          setConfirmIndex(null);
         }
       } else {
-        toast('此筆為舊資料，沒有雲端 ID，僅刪除本機');
+        toast('此筆為舊資料，沒有雲端 ID，無法從雲端刪除，請直接在 Google Sheet 上手動移除');
+        // 畫面仍移除本筆舊資料，但不會復原
+        const nextEntries = entries.filter((_, i) => i !== confirmIndex);
+        setEntries(nextEntries);
+        setConfirmIndex(null);
       }
+    } else {
+      // 非管理者模式：僅刪除本機暫存
+      const deleted = entries[confirmIndex];
+      setEntries(entries.filter((_, i) => i !== confirmIndex));
+      // setLastDeleted(deleted); // 移除這個狀態
+      setConfirmIndex(null);
+      toast('已刪除一筆本機回覆');
     }
-
-    // 即時更新畫面
-    const deleted = entries[confirmIndex];
-    setEntries(entries.filter((_, i) => i !== confirmIndex));
-    setLastDeleted(deleted);
-    setConfirmIndex(null);
-    toast('已刪除一筆回覆');
-
-    if (adminMode) fetchCloudEntries();
   }
 
   function cancelDeleteNow() { setConfirmIndex(null); }
-  function handleUndoDelete() {
-    if (lastDeleted) {
-      setEntries([lastDeleted, ...entries]);
-      setLastDeleted(null);
-      toast("已復原刪除的回覆");
-    }
-  }
+  // 移除 handleUndoDelete 功能，因為管理者模式下不處理本機復原
+  // function handleUndoDelete() {
+  //   if (lastDeleted) {
+  //     setEntries([lastDeleted, ...entries]);
+  //     setLastDeleted(null);
+  //     toast("已復原刪除的回覆");
+  //   }
+  // }
 
   function handleEdit(idx) { setForm({ ...entries[idx] }); setEditingIndex(idx); }
   function handleExport() {
@@ -386,9 +394,10 @@ export default function RSVPApp() {
             {adminMode && (
               <>
                 <Button onClick={handleExport} className="gap-2" aria-label="匯出CSV"><Download className="h-4 w-4" /> 匯出 CSV</Button>
-                {lastDeleted && (
+                {/* 移除復原按鈕，因為管理者模式下不再有本機復原功能 */}
+                {/* {lastDeleted && (
                   <Button onClick={handleUndoDelete} className="gap-2" aria-label="復原刪除"><RotateCcw className="h-4 w-4" /> 復原</Button>
-                )}
+                )} */}
               </>
             )}
             <Button variant={adminMode ? "secondary" : "outline"} onClick={toggleAdmin} className="gap-2" aria-label="管理者模式">
