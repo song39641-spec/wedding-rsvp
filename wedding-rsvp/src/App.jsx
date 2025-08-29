@@ -19,7 +19,7 @@ const LS_KEY = "wedding_rsvp_entries_v1";
 // === Google Sheets 連動設定 ===
 // 貼上你在 Apps Script 部署後拿到的 Web App URL，與同一組密鑰
 const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyHSvkGbR3ONR6ONnannHV_29hLQ1Zp-Zd5FseSqinDWhjqR6iC9vk0EMeVy4Cvhb10Gg/exec"; // 例如: https://script.google.com/macros/s/AKfycb.../exec
-const SHEET_SECRET = "932457";     // 與 Apps Script 裡的 SECRET 一致
+const SHEET_SECRET = "932457";       // 與 Apps Script 裡的 SECRET 一致
 
 const DEFAULT_FORM = {
   name: "",
@@ -202,13 +202,23 @@ export default function RSVPApp() {
       vegCount: toInt(form.vegCount, 0),
       createdAt: new Date().toLocaleString(),
     };
-    if (!String(payload.name).trim()) { toast('請填寫姓名'); return; }
+    if (!String(payload.name).trim()) {
+      toast('請填寫姓名');
+      return;
+    }
 
     if (payload.attending === 'yes') {
-      if (payload.total <= 0) { toast('出席人數需大於 0'); return; }
-      if (!validMealCounts) { toast('葷/素份數需與總人數一致'); return; }
+      if (payload.total <= 0) {
+        toast('出席人數需大於 0');
+        return;
+      }
+      if (!validMealCounts) {
+        toast('葷/素份數需與總人數一致');
+        return;
+      }
     } else {
-      payload.meatCount = 0; payload.vegCount = 0;
+      payload.meatCount = 0;
+      payload.vegCount = 0;
       payload.total = toInt(form.total, 0) || 0;
     }
 
@@ -217,7 +227,10 @@ export default function RSVPApp() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: SHEET_SECRET, action: 'create', data: payload })
-    }).then(async (r) => { const j = await r.json(); if (!j.ok) throw new Error('proxy not ok'); });
+    }).then(async (r) => {
+      const j = await r.json();
+      if (!j.ok) throw new Error('proxy not ok');
+    });
 
     sendPromise
       .then(() => {
@@ -226,18 +239,31 @@ export default function RSVPApp() {
           fetchCloudEntries();
         } else {
           // 非管理者（賓客）維持本機即時顯示
-          if (editingIndex !== null) { const next = [...entries]; next[editingIndex] = payload; setEntries(next); }
-          else { setEntries([payload, ...entries]); }
+          if (editingIndex !== null) {
+            const next = [...entries];
+            next[editingIndex] = payload;
+            setEntries(next);
+          } else {
+            setEntries([payload, ...entries]);
+          }
         }
-        setSuccessMsg('已收到您的回覆，感謝您的寶貴時間'); setSuccessOpen(true);
-        setTimeout(() => setSuccessOpen(false), 2500); resetForm();
+        setSuccessMsg('已收到您的回覆，感謝您的寶貴時間');
+        setSuccessOpen(true);
+        setTimeout(() => setSuccessOpen(false), 2500);
+        resetForm();
       })
       .catch(() => {
         if (!adminMode) {
           // 只有非管理者才會暫存本機
-          if (editingIndex !== null) { const next = [...entries]; next[editingIndex] = payload; setEntries(next); }
-          else { setEntries([payload, ...entries]); }
-          setSuccessMsg('已收到您的回覆（暫存於本機）'); setSuccessOpen(true);
+          if (editingIndex !== null) {
+            const next = [...entries];
+            next[editingIndex] = payload;
+            setEntries(next);
+          } else {
+            setEntries([payload, ...entries]);
+          }
+          setSuccessMsg('已收到您的回覆（暫存於本機）');
+          setSuccessOpen(true);
           setTimeout(() => setSuccessOpen(false), 2500);
         } else {
           toast('雲端寫入失敗');
@@ -246,31 +272,8 @@ export default function RSVPApp() {
       });
   }
 
-    const sendPromise = fetch("/api/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: SHEET_SECRET, action: "create", data: payload })
-    }).then(async (r) => { const j = await r.json(); if (!j.ok) throw new Error("proxy not ok"); });
-
-    sendPromise
-      .then(() => {
-        if (editingIndex !== null) {
-          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
-        } else {
-          setEntries([payload, ...entries]);
-        }
-        setSuccessMsg("已收到您的回覆，感謝您的寶貴時間");
-        setSuccessOpen(true);
-        setTimeout(() => setSuccessOpen(false), 2500);
-        resetForm();
-      })
-      .catch(() => {
-        toast("雲端寫入失敗");
-      });
-  }
-
   function handleDelete(idx) { setConfirmIndex(idx); }
-  async function confirmDeleteNow(){
+  async function confirmDeleteNow() {
     if (confirmIndex === null) return;
     const target = entries[confirmIndex];
 
@@ -283,7 +286,8 @@ export default function RSVPApp() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ secret: SHEET_SECRET, action: 'delete', id: target.id })
           });
-          const j = await r.json(); if (!j.ok) throw new Error('proxy not ok');
+          const j = await r.json();
+          if (!j.ok) throw new Error('proxy not ok');
         } catch (err) {
           toast('雲端刪除失敗');
         }
@@ -313,7 +317,10 @@ export default function RSVPApp() {
 
   function handleEdit(idx) { setForm({ ...entries[idx] }); setEditingIndex(idx); }
   function handleExport() {
-    if (!entries || entries.length === 0) { toast("目前沒有資料可匯出"); return; }
+    if (!entries || entries.length === 0) {
+      toast("目前沒有資料可匯出");
+      return;
+    }
     const csv = toCSV(entries);
     const date = new Date().toISOString().slice(0, 10);
     download(`婚禮RSVP_${date}.csv`, csv);
@@ -323,14 +330,23 @@ export default function RSVPApp() {
   function handleTotalChange(v) {
     const n = toInt(v, 0);
     if (form.attending === "yes") {
-      if (form.mealPref === "meat") { setForm({ ...form, total: n, meatCount: n, vegCount: 0 }); return; }
-      if (form.mealPref === "veg") { setForm({ ...form, total: n, meatCount: 0, vegCount: n }); return; }
+      if (form.mealPref === "meat") {
+        setForm({ ...form, total: n, meatCount: n, vegCount: 0 });
+        return;
+      }
+      if (form.mealPref === "veg") {
+        setForm({ ...form, total: n, meatCount: 0, vegCount: n });
+        return;
+      }
     }
     setForm({ ...form, total: n });
   }
 
   function toggleAdmin() {
-    if (adminMode) { setAdminMode(false); return; }
+    if (adminMode) {
+      setAdminMode(false);
+      return;
+    }
     setAskAdmin(true);
   }
 
@@ -369,25 +385,18 @@ export default function RSVPApp() {
           <div className="flex flex-wrap gap-2">
             {adminMode && (
               <>
-                <Button onClick={handleExport} className="gap-2" aria-label="匯出CSV"><Download className="h-4 w-4"/> 匯出 CSV</Button>
+                <Button onClick={handleExport} className="gap-2" aria-label="匯出CSV"><Download className="h-4 w-4" /> 匯出 CSV</Button>
                 {lastDeleted && (
-                  <Button onClick={handleUndoDelete} className="gap-2" aria-label="復原刪除"><RotateCcw className="h-4 w-4"/> 復原</Button>
+                  <Button onClick={handleUndoDelete} className="gap-2" aria-label="復原刪除"><RotateCcw className="h-4 w-4" /> 復原</Button>
                 )}
               </>
             )}
             <Button variant={adminMode ? "secondary" : "outline"} onClick={toggleAdmin} className="gap-2" aria-label="管理者模式">
-              {adminMode ? <Unlock className="h-4 w-4"/> : <Lock className="h-4 w-4"/>}
+              {adminMode ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               {adminMode ? "關閉管理者模式" : "管理者模式"}
             </Button>
           </div>
         </header>
-
-        {/* 若尚未設定雲端 WebApp，顯示提醒（只給管理者看）*/}
-        {adminMode && !SHEET_WEBAPP_URL && (
-          <div className="rounded-md bg-sky-50 border border-sky-200 px-4 py-3 text-sky-800 text-sm">
-            尚未設定 Google Sheet WebApp URL，賓客資料將只存於各自裝置本機。請先於 Apps Script 部署 Web App 並把網址與密鑰填入程式常數。
-          </div>
-        )}
 
         {/* 若尚未設定雲端 WebApp，顯示提醒（只給管理者看）*/}
         {adminMode && !SHEET_WEBAPP_URL && (
@@ -447,8 +456,8 @@ export default function RSVPApp() {
 
         <Tabs defaultValue="form" className="w-full">
           <TabsList className="grid w-full" style={{ gridTemplateColumns: adminMode ? "1fr 1fr" : "1fr" }}>
-            <TabsTrigger value="form" className="gap-1"><Plus className="h-4 w-4"/> 回覆表單</TabsTrigger>
-            {adminMode && (<TabsTrigger value="list" className="gap-1"><TableIcon className="h-4 w-4"/> 回覆列表與統計</TabsTrigger>)}
+            <TabsTrigger value="form" className="gap-1"><Plus className="h-4 w-4" /> 回覆表單</TabsTrigger>
+            {adminMode && (<TabsTrigger value="list" className="gap-1"><TableIcon className="h-4 w-4" /> 回覆列表與統計</TabsTrigger>)}
           </TabsList>
 
           {/* 表單分頁 */}
@@ -553,9 +562,9 @@ export default function RSVPApp() {
 
                   {/* 操作 */}
                   <div className="md:col-span-2 flex flex-wrap gap-3">
-                    <Button type="submit" className="gap-2"><Plus className="h-4 w-4"/>{editingIndex !== null ? "更新回覆" : "送出回覆"}</Button>
+                    <Button type="submit" className="gap-2"><Plus className="h-4 w-4" />{editingIndex !== null ? "更新回覆" : "送出回覆"}</Button>
                     {editingIndex !== null && (
-                      <Button type="button" variant="secondary" onClick={resetForm} className="gap-2"><X className="h-4 w-4"/> 取消編輯</Button>
+                      <Button type="button" variant="secondary" onClick={resetForm} className="gap-2"><X className="h-4 w-4" /> 取消編輯</Button>
                     )}
                   </div>
                 </form>
@@ -586,12 +595,12 @@ export default function RSVPApp() {
                       <li>未定/可能：<b>{summary.totalMaybe}</b> 人</li>
                       <li>不克出席：<b>{summary.totalNo}</b> 人</li>
                     </ul>
-                    <div className="mt-3 h-px w-full bg-slate-200"/>
+                    <div className="mt-3 h-px w-full bg-slate-200" />
                     <ul className="mt-3 space-y-1 text-sm">
                       <li>葷食：<b>{summary.meat}</b> 份</li>
                       <li>素食：<b>{summary.veg}</b> 份</li>
                     </ul>
-                    <div className="mt-3 h-px w-full bg-slate-200"/>
+                    <div className="mt-3 h-px w-full bg-slate-200" />
                     <ul className="mt-3 space-y-1 text-sm">
                       <li>男方賓客：<b>{summary.bySide.groom}</b> 人</li>
                       <li>女方賓客：<b>{summary.bySide.bride}</b> 人</li>
@@ -692,4 +701,3 @@ export default function RSVPApp() {
     console.warn("Dev tests warning:", err);
   }
 })();
-
