@@ -18,8 +18,8 @@ const LS_KEY = "wedding_rsvp_entries_v1";
 
 // === Google Sheets 連動設定 ===
 // 貼上你在 Apps Script 部署後拿到的 Web App URL，與同一組密鑰
-const SHEET_WEBAPP_URL = ""; // 例如: https://script.google.com/macros/s/AKfycb.../exec
-const SHEET_SECRET = "";     // 與 Apps Script 裡的 SECRET 一致
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyHSvkGbR3ONR6ONnannHV_29hLQ1Zp-Zd5FseSqinDWhjqR6iC9vk0EMeVy4Cvhb10Gg/exec"; // 例如: https://script.google.com/macros/s/AKfycb.../exec
+const SHEET_SECRET = "932457";     // 與 Apps Script 裡的 SECRET 一致
 
 const DEFAULT_FORM = {
   name: "",
