@@ -270,24 +270,26 @@ export default function RSVPApp() {
   }
 
   function handleDelete(idx) { setConfirmIndex(idx); }
-  async function confirmDeleteNow() {
+  async function confirmDeleteNow(){
     if (confirmIndex === null) return;
     const target = entries[confirmIndex];
 
-    // 管理者模式：先嘗試刪雲端（有 id 才能定位）
-    if (adminMode && target?.id) {
-      try {
-        const r = await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: SHEET_SECRET, action: 'delete', id: target.id })
-        });
-        const j = await r.json(); if (!j.ok) throw new Error('proxy not ok');
-      } catch (err) {
-        toast('雲端刪除失敗');
+    // 管理者模式：優先嘗試刪除雲端
+    if (adminMode) {
+      if (target?.id) {
+        try {
+          const r = await fetch('/api/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: SHEET_SECRET, action: 'delete', id: target.id })
+          });
+          const j = await r.json(); if (!j.ok) throw new Error('proxy not ok');
+        } catch (err) {
+          toast('雲端刪除失敗');
+        }
+      } else {
+        toast('此筆為舊資料，沒有雲端 ID，僅刪除本機');
       }
-    } else if (adminMode && !target?.id) {
-      toast('此筆為舊資料，沒有雲端 ID，僅刪除本機');
     }
 
     // 即時更新畫面
@@ -298,16 +300,6 @@ export default function RSVPApp() {
     toast('已刪除一筆回覆');
 
     if (adminMode) fetchCloudEntries();
-  }
-    } else {
-      toast("此筆資料沒有雲端 ID，只刪除本機");
-    }
-
-    const deleted = entries[confirmIndex];
-    setEntries(entries.filter((_, i) => i !== confirmIndex));
-    setLastDeleted(deleted);
-    setConfirmIndex(null);
-    toast("已刪除一筆回覆");
   }
 
   function cancelDeleteNow() { setConfirmIndex(null); }
@@ -700,3 +692,4 @@ export default function RSVPApp() {
     console.warn("Dev tests warning:", err);
   }
 })();
+
