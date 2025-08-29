@@ -220,7 +220,7 @@ export default function App(){
 
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">婚禮出席調查（RSVP）</h2>
+            <h2 className="text-3xl font-bold tracking-tight">婚禮出席調查</h2>
             <p className="text-slate-600">請親朋好友回覆是否出席、男方/女方、出席人數與餐點（葷/素）。</p>
           </div>
           <div className="flex flex-wrap gap-2">
