@@ -41,6 +41,11 @@ function toInt(v, d = 0) {
   return Number.isFinite(n) ? n : d;
 }
 
+// 產生唯一 id（用於 Google Sheet 對應刪除列）
+function genId() {
+  return (crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+}
+
 function mealCountsValid(attending, mealPref, total, meatCount, vegCount) {
   if (attending !== "yes") return true; // 只有出席時檢查
   if (mealPref === "mixed") return toInt(meatCount) + toInt(vegCount) === toInt(total);
@@ -138,8 +143,11 @@ export default function RSVPApp() {
   const [successMsg, setSuccessMsg] = useState("");
   const [lastDeleted, setLastDeleted] = useState(null); // 最近刪除項目
 
-  useEffect(() => { saveEntries(entries); }, [entries]);
+  // 管理者模式：改用雲端為單一真實來源；非管理者才會本機暫存
+  useEffect(() => { if (!adminMode) saveEntries(entries); }, [entries, adminMode]);
   useEffect(() => { localStorage.setItem(ADMIN_LS_KEY, adminMode ? "1" : "0"); }, [adminMode]);
+  // 進入/切換成管理者模式時，從雲端撈最新資料
+  useEffect(() => { if (adminMode) fetchCloudEntries(); }, [adminMode]);
 
   const summary = useMemo(() => {
     const init = { totalYes: 0, totalNo: 0, totalMaybe: 0, meat: 0, veg: 0, bySide: { groom: 0, bride: 0 } };
@@ -158,6 +166,22 @@ export default function RSVPApp() {
     form.attending, form.mealPref, toInt(form.total, 0), toInt(form.meatCount, 0), toInt(form.vegCount, 0)
   ), [form]);
 
+  // 只在管理者模式使用：從雲端（/api/submit -> GAS）載入最新資料
+  async function fetchCloudEntries() {
+    try {
+      const r = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: SHEET_SECRET, action: 'list' })
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error('list not ok');
+      setEntries(j.rows || []);
+    } catch (err) {
+      toast('雲端讀取失敗，顯示本機暫存');
+    }
+  }
+
   function resetForm() {
     setForm(DEFAULT_FORM);
     setEditingIndex(null);
@@ -171,37 +195,62 @@ export default function RSVPApp() {
   function handleSubmit(e) {
     e.preventDefault();
     const payload = {
+      id: form.id || genId(),
       ...form,
       total: toInt(form.total, 0),
       meatCount: toInt(form.meatCount, 0),
       vegCount: toInt(form.vegCount, 0),
       createdAt: new Date().toLocaleString(),
     };
-    if (!String(payload.name).trim()) { toast("請填寫姓名"); return; }
+    if (!String(payload.name).trim()) { toast('請填寫姓名'); return; }
 
-    if (payload.attending === "yes") {
-      if (payload.total <= 0) { toast("出席人數需大於 0"); return; }
-      if (!validMealCounts) { toast("葷/素份數需與總人數一致"); return; }
+    if (payload.attending === 'yes') {
+      if (payload.total <= 0) { toast('出席人數需大於 0'); return; }
+      if (!validMealCounts) { toast('葷/素份數需與總人數一致'); return; }
     } else {
       payload.meatCount = 0; payload.vegCount = 0;
       payload.total = toInt(form.total, 0) || 0;
     }
 
-    // === 送到 Google Sheet（若已設定 URL） ===
-    const sendPromise = SHEET_WEBAPP_URL
-      ? fetch(SHEET_WEBAPP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: SHEET_SECRET, data: payload })
-        }).then(async (res) => {
-          try {
-            const j = await res.json();
-            if (!j.ok) throw new Error("sheet not ok");
-          } catch (err) {
-            throw err;
-          }
-        })
-      : Promise.resolve();
+    // 管理者/賓客都經由同網域 proxy，避免 CORS
+    const sendPromise = fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: SHEET_SECRET, action: 'create', data: payload })
+    }).then(async (r) => { const j = await r.json(); if (!j.ok) throw new Error('proxy not ok'); });
+
+    sendPromise
+      .then(() => {
+        if (adminMode) {
+          // 管理者模式完全以雲端為準
+          fetchCloudEntries();
+        } else {
+          // 非管理者（賓客）維持本機即時顯示
+          if (editingIndex !== null) { const next = [...entries]; next[editingIndex] = payload; setEntries(next); }
+          else { setEntries([payload, ...entries]); }
+        }
+        setSuccessMsg('已收到您的回覆，感謝您的寶貴時間'); setSuccessOpen(true);
+        setTimeout(() => setSuccessOpen(false), 2500); resetForm();
+      })
+      .catch(() => {
+        if (!adminMode) {
+          // 只有非管理者才會暫存本機
+          if (editingIndex !== null) { const next = [...entries]; next[editingIndex] = payload; setEntries(next); }
+          else { setEntries([payload, ...entries]); }
+          setSuccessMsg('已收到您的回覆（暫存於本機）'); setSuccessOpen(true);
+          setTimeout(() => setSuccessOpen(false), 2500);
+        } else {
+          toast('雲端寫入失敗');
+        }
+        resetForm();
+      });
+  }
+
+    const sendPromise = fetch("/api/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: SHEET_SECRET, action: "create", data: payload })
+    }).then(async (r) => { const j = await r.json(); if (!j.ok) throw new Error("proxy not ok"); });
 
     sendPromise
       .then(() => {
@@ -216,28 +265,51 @@ export default function RSVPApp() {
         resetForm();
       })
       .catch(() => {
-        toast(SHEET_WEBAPP_URL ? "送出失敗：雲端寫入異常，已暫存本機" : "尚未設定雲端連結，僅保存於本機");
-        if (editingIndex !== null) {
-          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
-        } else {
-          setEntries([payload, ...entries]);
-        }
-        setSuccessMsg("已收到您的回覆（暫存於本機）");
-        setSuccessOpen(true);
-        setTimeout(() => setSuccessOpen(false), 2500);
-        resetForm();
+        toast("雲端寫入失敗");
       });
   }
 
   function handleDelete(idx) { setConfirmIndex(idx); }
-  function confirmDeleteNow() {
+  async async function confirmDeleteNow() {
     if (confirmIndex === null) return;
+    const target = entries[confirmIndex];
+
+    // 管理者模式：先嘗試刪雲端（有 id 才能定位）
+    if (adminMode && target?.id) {
+      try {
+        const r = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: SHEET_SECRET, action: 'delete', id: target.id })
+        });
+        const j = await r.json(); if (!j.ok) throw new Error('proxy not ok');
+      } catch (err) {
+        toast('雲端刪除失敗');
+      }
+    } else if (adminMode && !target?.id) {
+      toast('此筆為舊資料，沒有雲端 ID，僅刪除本機');
+    }
+
+    // 即時更新畫面
     const deleted = entries[confirmIndex];
     setEntries(entries.filter((_, i) => i !== confirmIndex));
     setLastDeleted(deleted);
     setConfirmIndex(null);
-    toast("已刪除一筆回覆，可點選復原");
+    toast('已刪除一筆回覆');
+
+    if (adminMode) fetchCloudEntries();
   }
+    } else {
+      toast("此筆資料沒有雲端 ID，只刪除本機");
+    }
+
+    const deleted = entries[confirmIndex];
+    setEntries(entries.filter((_, i) => i !== confirmIndex));
+    setLastDeleted(deleted);
+    setConfirmIndex(null);
+    toast("已刪除一筆回覆");
+  }
+
   function cancelDeleteNow() { setConfirmIndex(null); }
   function handleUndoDelete() {
     if (lastDeleted) {
