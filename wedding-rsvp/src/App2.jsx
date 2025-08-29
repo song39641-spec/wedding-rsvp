@@ -17,8 +17,8 @@ const LS_KEY = "wedding_rsvp_entries_v1";
 // === Google Sheets 連動設定（把下面兩個值改成你的設定） ===
 // 例：SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycb.../exec"
 // 例：SHEET_SECRET     = "你在 Apps Script 端設定的 SECRET（要一樣）"
-const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzZIsmwNcvWKIS1qiEO01hcUtyJkwTSZTDMuj5dXF_4U6ss0EPVBzYxwhyZ48ZizsvoNw/exec";
-const SHEET_SECRET = "MyWeddingRSVP2026";
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyHSvkGbR3ONR6ONnannHV_29hLQ1Zp-Zd5FseSqinDWhjqR6iC9vk0EMeVy4Cvhb10Gg/exec";
+const SHEET_SECRET = "932457";
 
 const DEFAULT_FORM = {
   name: "",
