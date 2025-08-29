@@ -13,6 +13,10 @@ import { X, Download, Plus, Table as TableIcon, Lock, Unlock, RotateCcw } from "
 const ADMIN_CODE = "932457";
 const ADMIN_LS_KEY = "wedding_rsvp_admin_mode";
 const LS_KEY = "wedding_rsvp_entries_v1";
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz6cKGXRFgDPjFL6Bjvx7Ew1kDVwFnvpps9VIxD30JeQopnYtPTB2W0hxQDJfudF7pOlw/exec
+"; // ← 貼你的 Web App URL
+const SHEET_SECRET = "AKfycbz6cKGXRFgDPjFL6Bjvx7Ew1kDVwFnvpps9VIxD30JeQopnYtPTB2W0hxQDJfudF7pOlw";   // ← 要跟 Apps Script 裡的 SECRET 一樣
+
 
 const DEFAULT_FORM = {
   name: "",
