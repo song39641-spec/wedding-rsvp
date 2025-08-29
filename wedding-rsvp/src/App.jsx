@@ -35,6 +35,11 @@ const DEFAULT_FORM = {
 function toInt(v, d = 0) {
   const n = parseInt(String(v).replace(/[^0-9-]/g, ""), 10);
   return Number.isFinite(n) ? n : d;
+  
+}
+// 產生唯一 id（用於 Google Sheet 刪除對應列）
+function genId() {
+  return (crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
 }
 
 function mealCountsValid(attending, mealPref, total, meatCount, vegCount) {
@@ -137,68 +142,94 @@ export default function App(){
   function resetForm(){ setForm(DEFAULT_FORM); setEditingIndex(null); }
   function toast(msg){ setBanner(msg); setTimeout(()=>setBanner(null), 3000); }
 
-  function handleSubmit(e){
-    e.preventDefault();
-    const payload = {
-      ...form,
-      total: toInt(form.total, 0),
-      meatCount: toInt(form.meatCount, 0),
-      vegCount: toInt(form.vegCount, 0),
-      createdAt: new Date().toLocaleString(),
-    };
-    if (!String(payload.name).trim()){ toast("請填寫姓名"); return; }
+function handleSubmit(e) {
+  e.preventDefault();
+  const payload = {
+    id: form.id || genId(),         // ★ 新增：唯一識別 id
+    ...form,
+    total: toInt(form.total, 0),
+    meatCount: toInt(form.meatCount, 0),
+    vegCount: toInt(form.vegCount, 0),
+    createdAt: new Date().toLocaleString(),
+  };
+  if (!String(payload.name).trim()) { toast("請填寫姓名"); return; }
 
-    if (payload.attending === "yes"){
-      if (payload.total <= 0){ toast("出席人數需大於 0"); return; }
-      if (!validMealCounts){ toast("葷/素份數需與總人數一致"); return; }
-    } else {
-      payload.meatCount = 0; payload.vegCount = 0;
-      payload.total = toInt(form.total, 0) || 0;
-    }
-
-    // === 新增：先嘗試寫入 Google Sheet（若已設定 URL） ===
-    const sendPromise = SHEET_WEBAPP_URL
-      ? fetch("/api/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: SHEET_SECRET, data: payload }),
-        }).then(async (res) => {
-          // 期望 GAS 回傳 { ok: true }
-          const text = await res.text();
-          try {
-            const j = JSON.parse(text);
-            if (!j.ok) throw new Error("sheet not ok");
-          } catch (err) {
-            throw err;
-          }
-        })
-      : Promise.resolve();
-
-    sendPromise
-      .then(() => {
-        if (editingIndex !== null){
-          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
-        } else {
-          setEntries([payload, ...entries]);
-        }
-        setSuccessMsg("已收到您的回覆，感謝您的寶貴時間"); setSuccessOpen(true);
-        setTimeout(()=>setSuccessOpen(false), 2500); resetForm();
-      })
-      .catch(() => {
-        // 寫入雲端失敗時，仍暫存本機避免遺失
-        if (editingIndex !== null){
-          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
-        } else {
-          setEntries([payload, ...entries]);
-        }
-        toast(SHEET_WEBAPP_URL ? "送出失敗：雲端寫入異常，已暫存本機" : "尚未設定雲端連結，僅保存於本機");
-        setSuccessMsg("已收到您的回覆（暫存於本機）"); setSuccessOpen(true);
-        setTimeout(()=>setSuccessOpen(false), 2500); resetForm();
-      });
+  if (payload.attending === "yes") {
+    if (payload.total <= 0) { toast("出席人數需大於 0"); return; }
+    if (!validMealCounts) { toast("葷/素份數需與總人數一致"); return; }
+  } else {
+    payload.meatCount = 0; payload.vegCount = 0;
+    payload.total = toInt(form.total, 0) || 0;
   }
 
+  // ★ 改走你在 Vercel 的 serverless 代理，action=create
+  const sendPromise = fetch("/api/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret: SHEET_SECRET, action: "create", data: payload })
+  }).then(async (r) => {
+    const j = await r.json(); if (!j.ok) throw new Error("proxy not ok");
+  });
+
+  sendPromise
+    .then(() => {
+      if (editingIndex !== null) {
+        const next = [...entries]; next[editingIndex] = payload; setEntries(next);
+      } else {
+        setEntries([payload, ...entries]);
+      }
+      setSuccessMsg("已收到您的回覆，感謝您的寶貴時間");
+      setSuccessOpen(true);
+      setTimeout(() => setSuccessOpen(false), 2500);
+      resetForm();
+    })
+    .catch(() => {
+      // 失敗：先暫存本機（保險）
+      if (editingIndex !== null) {
+        const next = [...entries]; next[editingIndex] = payload; setEntries(next);
+      } else {
+        setEntries([payload, ...entries]);
+      }
+      toast("雲端寫入失敗，已暫存本機");
+      setSuccessMsg("已收到您的回覆（暫存於本機）");
+      setSuccessOpen(true);
+      setTimeout(() => setSuccessOpen(false), 2500);
+      resetForm();
+    });
+}
+
+
   function handleDelete(idx){ setConfirmIndex(idx); }
-  function confirmDeleteNow(){
+ async function confirmDeleteNow() {
+  if (confirmIndex === null) return;
+  const target = entries[confirmIndex];
+
+  // ★ 有 id 的新資料，請後端刪雲端
+  if (target?.id) {
+    try {
+      const r = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: SHEET_SECRET, action: "delete", id: target.id })
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error("proxy not ok");
+    } catch (err) {
+      toast("雲端刪除失敗，僅刪除本機資料");
+    }
+  } else {
+    // 舊資料（當初沒有 id）只能刪本機
+    toast("此筆為舊資料，沒有雲端 ID，僅刪除本機");
+  }
+
+  // 不論雲端是否成功，先更新本機 UI
+  const deleted = entries[confirmIndex];
+  setEntries(entries.filter((_, i) => i !== confirmIndex));
+  setLastDeleted(deleted);
+  setConfirmIndex(null);
+  toast("已刪除一筆回覆，可點選復原");
+}
+
     if (confirmIndex === null) return;
     const deleted = entries[confirmIndex];
     setEntries(entries.filter((_, i)=>i!==confirmIndex));
