@@ -218,8 +218,8 @@ export default function App(){
           <h1 className="text-2xl font-bold">郭松霖 & 李婕妤 婚宴</h1>
           <p className="text-slate-700">誠摯邀請您與我們一同見證愛的承諾</p>
           <p className="italic text-slate-600">Join us as we celebrate the union of our hearts.</p>
-          <p className="mt-2">婚禮日期｜2026年3月1號｜星期日</p>
-          <p>婚禮地點｜老新台菜｜高雄市三民區十全三路265號燕｜匯Ａ廳</p>
+          <p className="mt-2">婚禮日期:｜2026年3月1號｜星期日</p>
+          <p>婚禮地點:｜老新台菜｜高雄市三民區十全三路265號燕｜匯Ａ廳</p>
           <div className="h-px w-full bg-slate-200 my-4" />
         </section>
 
