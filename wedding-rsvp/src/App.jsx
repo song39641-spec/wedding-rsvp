@@ -14,7 +14,11 @@ const ADMIN_CODE = "932457";
 const ADMIN_LS_KEY = "wedding_rsvp_admin_mode";
 const LS_KEY = "wedding_rsvp_entries_v1";
 
-
+// === Google Sheets 連動設定（把下面兩個值改成你的設定） ===
+// 例：SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycb.../exec"
+// 例：SHEET_SECRET     = "你在 Apps Script 端設定的 SECRET（要一樣）"
+const SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbz6cKGXRFgDPjFL6Bjvx7Ew1kDVwFnvpps9VIxD30JeQopnYtPTB2W0hxQDJfudF7pOlw/exec";
+const SHEET_SECRET = "AKfycbz6cKGXRFgDPjFL6Bjvx7Ew1kDVwFnvpps9VIxD30JeQopnYtPTB2W0hxQDJfudF7pOlw";
 
 const DEFAULT_FORM = {
   name: "",
@@ -65,16 +69,16 @@ function toCSV(rows) {
       r.meatCount,
       r.vegCount,
       r.phone,
-      String(r.notes || "").replaceAll("\\n", " ").replaceAll(",", "、"),
+      String(r.notes || "").replaceAll("\n", " ").replaceAll(",", "、"),
     ];
     lines.push(arr.map((x) => `"${String(x).replaceAll('"', '""')}"`).join(","));
   }
-  return lines.join("\\n");
+  return lines.join("\n");
 }
 
 function download(filename, content) {
   try {
-    const bom = "\\uFEFF";
+    const bom = "\uFEFF";
     const blob = new Blob([bom + content], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -152,14 +156,45 @@ export default function App(){
       payload.total = toInt(form.total, 0) || 0;
     }
 
-    if (editingIndex !== null){
-      const next = [...entries]; next[editingIndex] = payload; setEntries(next);
-      setSuccessMsg("已收到您的回覆，感謝您的寶貴時間"); setSuccessOpen(true);
-      setTimeout(()=>setSuccessOpen(false), 2500); resetForm(); return;
-    }
-    setEntries([payload, ...entries]);
-    setSuccessMsg("已收到您的回覆，感謝您的寶貴時間"); setSuccessOpen(true);
-    setTimeout(()=>setSuccessOpen(false), 2500); resetForm();
+    // === 新增：先嘗試寫入 Google Sheet（若已設定 URL） ===
+    const sendPromise = SHEET_WEBAPP_URL
+      ? fetch(SHEET_WEBAPP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: SHEET_SECRET, data: payload }),
+        }).then(async (res) => {
+          // 期望 GAS 回傳 { ok: true }
+          const text = await res.text();
+          try {
+            const j = JSON.parse(text);
+            if (!j.ok) throw new Error("sheet not ok");
+          } catch (err) {
+            throw err;
+          }
+        })
+      : Promise.resolve();
+
+    sendPromise
+      .then(() => {
+        if (editingIndex !== null){
+          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
+        } else {
+          setEntries([payload, ...entries]);
+        }
+        setSuccessMsg("已收到您的回覆，感謝您的寶貴時間"); setSuccessOpen(true);
+        setTimeout(()=>setSuccessOpen(false), 2500); resetForm();
+      })
+      .catch(() => {
+        // 寫入雲端失敗時，仍暫存本機避免遺失
+        if (editingIndex !== null){
+          const next = [...entries]; next[editingIndex] = payload; setEntries(next);
+        } else {
+          setEntries([payload, ...entries]);
+        }
+        toast(SHEET_WEBAPP_URL ? "送出失敗：雲端寫入異常，已暫存本機" : "尚未設定雲端連結，僅保存於本機");
+        setSuccessMsg("已收到您的回覆（暫存於本機）"); setSuccessOpen(true);
+        setTimeout(()=>setSuccessOpen(false), 2500); resetForm();
+      });
   }
 
   function handleDelete(idx){ setConfirmIndex(idx); }
@@ -213,10 +248,10 @@ export default function App(){
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="text-center space-y-2">
           <img
-    src="/20250408-315.jpg"
-    alt="婚紗照"
-    className="mx-auto rounded-xl shadow-lg max-h-[500px] w-full object-cover"
-  />
+            src="/20250408-315.jpg"
+            alt="婚紗照"
+            className="mx-auto rounded-xl shadow-lg max-h-[500px] w-full object-cover"
+          />
           <h1 className="text-2xl font-bold">郭松霖 & 李婕妤 婚宴</h1>
           <p className="text-slate-700">誠摯邀請您與我們一同見證愛的承諾</p>
           <p className="italic text-slate-600">Join us as we celebrate the union of our hearts.</p>
@@ -243,6 +278,13 @@ export default function App(){
             </Button>
           </div>
         </header>
+
+        {/* 若尚未設定雲端 WebApp，顯示提醒（只給管理者看） */}
+        {adminMode && !SHEET_WEBAPP_URL && (
+          <div className="rounded-md bg-sky-50 border border-sky-200 px-4 py-3 text-sky-800 text-sm">
+            尚未設定 Google Sheet WebApp URL，賓客資料將只存於各自裝置本機。請先於 Apps Script 部署 Web App 並把網址與密鑰填入程式常數。
+          </div>
+        )}
 
         {banner && (<div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-amber-800 text-sm">{banner}</div>)}
 
@@ -339,7 +381,7 @@ export default function App(){
                       if (v === "meat") setForm({ ...form, mealPref: v, meatCount: form.total, vegCount: 0 });
                       else if (v === "veg") setForm({ ...form, mealPref: v, meatCount: 0, vegCount: form.total });
                       else setForm({ ...form, mealPref: v });
-                    }} disabled={!isAttendingYes}>
+                    }} disabled={form.attending !== "yes"}>
                       <SelectTrigger><SelectValue placeholder="選擇餐點" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="meat">全部葷食</SelectItem>
@@ -349,12 +391,12 @@ export default function App(){
                     </Select>
                   </div>
 
-                  <div className={`space-y-2 ${isAttendingYes ? "" : "opacity-50"}`}>
+                  <div className={`space-y-2 ${form.attending === "yes" ? "" : "opacity-50"}`}>
                     <Label>葷/素 份數</Label>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="meatCount" className="text-xs text-slate-500">葷食</Label>
-                        <Select value={String(form.meatCount)} onValueChange={(v)=>setForm({ ...form, meatCount: toInt(v, 0) })} disabled={!isAttendingYes || form.mealPref !== "mixed"}>
+                        <Select value={String(form.meatCount)} onValueChange={(v)=>setForm({ ...form, meatCount: toInt(v, 0) })} disabled={form.attending !== "yes" || form.mealPref !== "mixed"}>
                           <SelectTrigger id="meatCount"><SelectValue placeholder="選擇份數" /></SelectTrigger>
                           <SelectContent>
                             {numberOptions.map((opt)=>(<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
@@ -363,7 +405,7 @@ export default function App(){
                       </div>
                       <div>
                         <Label htmlFor="vegCount" className="text-xs text-slate-500">素食</Label>
-                        <Select value={String(form.vegCount)} onValueChange={(v)=>setForm({ ...form, vegCount: toInt(v, 0) })} disabled={!isAttendingYes || form.mealPref !== "mixed"}>
+                        <Select value={String(form.vegCount)} onValueChange={(v)=>setForm({ ...form, vegCount: toInt(v, 0) })} disabled={form.attending !== "yes" || form.mealPref !== "mixed"}>
                           <SelectTrigger id="vegCount"><SelectValue placeholder="選擇份數" /></SelectTrigger>
                           <SelectContent>
                             {numberOptions.map((opt)=>(<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
@@ -371,7 +413,7 @@ export default function App(){
                         </Select>
                       </div>
                     </div>
-                    {isAttendingYes && !validMealCounts && (
+                    {form.attending === "yes" && !validMealCounts && (
                       <p className="text-sm text-rose-600">葷食與素食份數加總需等於出席人數（目前為 {toInt(form.meatCount) + toInt(form.vegCount)} / {toInt(form.total)}）。</p>
                     )}
                   </div>
@@ -478,7 +520,7 @@ export default function App(){
         </Tabs>
 
         <footer className="text-center text-xs text-slate-500">
-          <p>資料僅儲存在您的瀏覽器（LocalStorage）。匯出 CSV 後可分享或彙整到 Excel / Google 試算表。</p>
+          <p>資料會先嘗試寫入 Google 試算表；若未設定或失敗，會暫存於您的瀏覽器（LocalStorage）。匯出 CSV 後可分享或彙整到 Excel / Google 試算表。</p>
         </footer>
       </div>
     </div>
