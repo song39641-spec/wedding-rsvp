@@ -210,6 +210,11 @@ export default function App(){
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="text-center space-y-2">
+          <img
+    src="/wedding-photo.jpg"
+    alt="婚紗照"
+    className="mx-auto rounded-xl shadow-lg max-h-[500px] w-full object-cover"
+  />
           <h1 className="text-2xl font-bold">郭松霖 & 李婕妤 婚宴</h1>
           <p className="text-slate-700">誠摯邀請您與我們一同見證愛的承諾</p>
           <p className="italic text-slate-600">Join us as we celebrate the union of our hearts.</p>
